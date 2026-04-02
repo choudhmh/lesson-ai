@@ -27,7 +27,7 @@ interface AnalysisResult {
 
 const LessonAnalyzer: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
-  const [lessonText, setLessonText] = useState<string>("");
+  const [lessonText, setLessonText] = useState("");
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -35,7 +35,15 @@ const LessonAnalyzer: React.FC = () => {
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { register, handleSubmit, reset } = useForm<Answers>();
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isValid },
+  } = useForm<Answers>({
+    mode: "onChange", // 🔥 enables live validation
+  });
 
   /* ================= HELPERS ================= */
 
@@ -88,6 +96,10 @@ const LessonAnalyzer: React.FC = () => {
 
       if (!qRes.ok || !Array.isArray(qData.questions)) {
         throw new Error(qData.error || "Invalid questions format");
+      }
+
+      if (qData.questions.length !== 5) {
+        throw new Error("Must return exactly 5 questions");
       }
 
       setQuestions(qData.questions);
@@ -182,27 +194,45 @@ const LessonAnalyzer: React.FC = () => {
       {/* Questions */}
       {questions.length === 5 && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {questions.map((q, index) => (
-            <div key={q.key}>
-              <label className="block font-semibold mb-1">
-                {q.key}:
-              </label>
-              <p className="text-sm mb-2 text-gray-700">{q.question}</p>
+          {questions.map((q, index) => {
+            const fieldName = `Q${index + 1}` as keyof Answers;
 
-              <textarea
-                {...register(`Q${index + 1}` as keyof Answers, {
-                  required: true,
-                })}
-                placeholder="Write your reflection..."
-                className="w-full p-2 border rounded"
-                rows={3}
-              />
-            </div>
-          ))}
+            return (
+              <div key={q.key}>
+                <label className="block font-semibold mb-1">
+                  {q.key}:
+                </label>
+
+                <p className="text-sm mb-2 text-gray-700">
+                  {q.question}
+                </p>
+
+                <textarea
+                  {...register(fieldName, {
+                    required: "This question must be answered",
+                    minLength: {
+                      value: 15,
+                      message: "Answer must be at least 15 characters",
+                    },
+                  })}
+                  placeholder="Write a thoughtful reflection..."
+                  className="w-full p-2 border rounded"
+                  rows={3}
+                />
+
+                {/* 🔥 ERROR DISPLAY (FIXED) */}
+                {errors[fieldName] && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors[fieldName]?.message}
+                  </p>
+                )}
+              </div>
+            );
+          })}
 
           <button
             type="submit"
-            disabled={analyzing}
+            disabled={analyzing || !isValid}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
           >
             {analyzing ? "Analyzing..." : "Submit for Feedback"}
@@ -215,14 +245,16 @@ const LessonAnalyzer: React.FC = () => {
         <div className="mt-6 p-4 border rounded bg-green-50">
           <h2 className="text-xl font-bold mb-3">AI Feedback</h2>
 
-          {(Object.keys(analysis.feedback) as (keyof Answers)[]).map((key, i) => (
-            <div key={key} className="mb-3">
-              <strong>
-                {questions[i]?.key} ({key}):
-              </strong>
-              <p>{analysis.feedback[key]}</p>
-            </div>
-          ))}
+          {(Object.keys(analysis.feedback) as (keyof Answers)[]).map(
+            (key, i) => (
+              <div key={key} className="mb-3">
+                <strong>
+                  {questions[i]?.key} ({key}):
+                </strong>
+                <p>{analysis.feedback[key]}</p>
+              </div>
+            )
+          )}
 
           <div className="mt-4">
             <strong>General Suggestions:</strong>
