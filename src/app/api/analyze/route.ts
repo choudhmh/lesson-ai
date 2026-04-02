@@ -9,19 +9,23 @@ interface Answers {
   Q5: string;
 }
 
+interface QuestionItem {
+  key: "Notice" | "Appreciate" | "Probe" | "Connect" | "Extend";
+  question: string;
+}
+
 interface AnalysisResult {
   feedback: Record<keyof Answers, string>;
   generalSuggestions: string;
 }
 
-// Toggle this to true to use OpenAI API, false to use dev stub
 const USE_OPENAI = true;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Safely extract error message from OpenAI
+// Extract OpenAI error message safely
 function getOpenAIErrorMessage(error: unknown): string {
   if (typeof error === "object" && error !== null && "error" in error) {
     const maybeError = (error as { error?: { message?: string } }).error;
@@ -32,82 +36,103 @@ function getOpenAIErrorMessage(error: unknown): string {
   return "Unknown error";
 }
 
-// Remove Markdown code fences from GPT response
+// Clean markdown ```json blocks
 function cleanGPTContent(content: string) {
   return content
-    .replace(/^```json\s*/, "") // opening ```json
-    .replace(/^```\s*/, "")     // opening ```
-    .replace(/```$/, "")        // closing ```
+    .replace(/^```json\s*/i, "")
+    .replace(/^```/i, "")
+    .replace(/```$/, "")
     .trim();
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { lessonText, answers } = (await req.json()) as {
-      lessonText?: string;
-      answers?: Answers;
-    };
+    const { lessonText, answers, questions } = await req.json();
 
-    if (!lessonText || !answers) {
-      return NextResponse.json({ error: "Missing lessonText or answers" }, { status: 400 });
+    if (!lessonText || !answers || !questions) {
+      return NextResponse.json(
+        { error: "Missing lessonText, questions, or answers" },
+        { status: 400 }
+      );
     }
 
-    // Dev stub
+    // Ensure correct structure
+    const formattedQuestions: QuestionItem[] = questions;
+
+    // DEV MODE
     if (!USE_OPENAI) {
-      const sample: AnalysisResult = {
-        feedback: {
-          Q1: "Sample feedback for Q1",
-          Q2: "Sample feedback for Q2",
-          Q3: "Sample feedback for Q3",
-          Q4: "Sample feedback for Q4",
-          Q5: "Sample feedback for Q5",
+      return NextResponse.json({
+        analysis: {
+          feedback: {
+            Q1: "Notice feedback sample",
+            Q2: "Appreciate feedback sample",
+            Q3: "Probe feedback sample",
+            Q4: "Connect feedback sample",
+            Q5: "Extend feedback sample",
+          },
+          generalSuggestions: "Sample general suggestions",
         },
-        generalSuggestions: "Sample general suggestions for the lesson plan.",
-      };
-      return NextResponse.json({ analysis: sample });
+      });
     }
 
-    // GPT prompt
+    // 🔥 STRONG CATEGORY-AWARE PROMPT
     const prompt = `
-    You are an expert teacher and pedagogy consultant. 
-    Analyze the following lesson plan and the teacher's answers in depth.
-    
-    Lesson Plan:
-    ${lessonText}
-    
-    Teacher Answers:
-    ${JSON.stringify(answers, null, 2)}
-    
-    Please provide a **detailed, constructive, and thorough** feedback, following these rules:
-    
-    1. Feedback for each question (Q1–Q5). For each:
-       - Give specific examples or reasoning from the lesson plan.
-       - Suggest improvements where appropriate.
-       - Explain why the point matters for student learning.
-    
-    2. General suggestions:
-       - Summarize overall strengths and weaknesses of the lesson plan.
-       - Suggest actionable steps to improve engagement, clarity, or learning outcomes.
-    
-    Respond ONLY in JSON format exactly like this:
-    
-    {
-      "feedback": {
-        "Q1": "... detailed feedback for Q1 ...",
-        "Q2": "... detailed feedback for Q2 ...",
-        "Q3": "... detailed feedback for Q3 ...",
-        "Q4": "... detailed feedback for Q4 ...",
-        "Q5": "... detailed feedback for Q5 ..."
-      },
-      "generalSuggestions": "... detailed general suggestions ..."
-    }
-    `;
-    
+You are an expert instructional coach providing deep, thoughtful feedback.
+
+Lesson Plan:
+${lessonText}
+
+Reflection Questions (with categories):
+${JSON.stringify(formattedQuestions, null, 2)}
+
+Teacher Answers:
+${JSON.stringify(answers, null, 2)}
+
+IMPORTANT:
+Each question belongs to ONE category:
+- Notice → identify what stands out
+- Appreciate → highlight strengths
+- Probe → deepen thinking with questions
+- Connect → relate to experience
+- Extend → push thinking further
+
+TASK:
+
+Provide detailed feedback for EACH response:
+
+For EACH Q1–Q5:
+- Reference the lesson plan
+- Reference the teacher's answer
+- Align feedback with the category purpose
+- Identify strengths
+- Identify gaps or missed opportunities
+- Suggest specific improvements
+- Write at least 3–5 sentences
+
+Then provide GENERAL FEEDBACK:
+- Overall strengths of the lesson
+- Key gaps or risks
+- Clear actionable improvements
+
+Respond ONLY in valid JSON:
+
+{
+  "feedback": {
+    "Q1": "...",
+    "Q2": "...",
+    "Q3": "...",
+    "Q4": "...",
+    "Q5": "..."
+  },
+  "generalSuggestions": "..."
+}
+`;
 
     try {
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
       });
 
       let content = response.choices[0].message?.content ?? "";
@@ -117,26 +142,43 @@ export async function POST(req: NextRequest) {
         const parsed: AnalysisResult = JSON.parse(content);
         return NextResponse.json({ analysis: parsed });
       } catch (parseError) {
-        console.warn("Failed to parse GPT output as JSON:", parseError);
+        console.warn("JSON parse failed:", parseError);
+
         return NextResponse.json({
           analysis: {
-            feedback: { Q1: "Could not parse AI response", Q2: "", Q3: "", Q4: "", Q5: "" },
-            generalSuggestions: content, // raw content fallback
+            feedback: {
+              Q1: "⚠️ Parsing failed — see raw output below",
+              Q2: "",
+              Q3: "",
+              Q4: "",
+              Q5: "",
+            },
+            generalSuggestions: content,
           },
         });
       }
     } catch (openAIError: unknown) {
-      console.error("OpenAI request failed:", openAIError);
       const message = getOpenAIErrorMessage(openAIError);
+
       return NextResponse.json({
         analysis: {
-          feedback: { Q1: "AI request failed: " + message, Q2: "", Q3: "", Q4: "", Q5: "" },
+          feedback: {
+            Q1: "AI error: " + message,
+            Q2: "",
+            Q3: "",
+            Q4: "",
+            Q5: "",
+          },
           generalSuggestions: "",
         },
       });
     }
   } catch (error) {
     console.error("Analyze API failed:", error);
-    return NextResponse.json({ error: "Analyze API failed" }, { status: 500 });
+
+    return NextResponse.json(
+      { error: "Analyze API failed" },
+      { status: 500 }
+    );
   }
 }
