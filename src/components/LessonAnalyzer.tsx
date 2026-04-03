@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
+import Image from "next/image";
 
 /* ================= TYPES ================= */
 
@@ -19,7 +20,7 @@ interface QuestionItem {
 }
 
 interface AnalysisResult {
-  feedback: Record<keyof Answers, string>;
+  feedback: Record<string, string>;
   generalSuggestions: string;
 }
 
@@ -41,7 +42,7 @@ const LessonAnalyzer: React.FC = () => {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm<Answers>({
     mode: "onChange",
   });
@@ -55,36 +56,29 @@ const LessonAnalyzer: React.FC = () => {
   /* ================= UPLOAD + GENERATE ================= */
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
+    if (!e.target.files?.length) return;
 
     const selectedFile = e.target.files[0];
-
     setFile(selectedFile);
     setAnalysis(null);
     setQuestions([]);
     reset();
-
     setUploading(true);
 
     const formData = new FormData();
     formData.append("file", selectedFile);
 
     try {
-      // Upload
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
 
       const uploadData = await uploadRes.json();
-
-      if (!uploadRes.ok || !uploadData.text) {
+      if (!uploadRes.ok || !uploadData.text)
         throw new Error(uploadData.error || "Upload failed");
-      }
 
       setLessonText(uploadData.text);
-
-      // Generate Questions
       setLoadingQuestions(true);
 
       const qRes = await fetch("/api/generate-questions", {
@@ -94,14 +88,10 @@ const LessonAnalyzer: React.FC = () => {
       });
 
       const qData = await qRes.json();
-
-      if (!qRes.ok || !Array.isArray(qData.questions)) {
+      if (!qRes.ok || !Array.isArray(qData.questions))
         throw new Error(qData.error || "Invalid questions format");
-      }
-
-      if (qData.questions.length !== 5) {
+      if (qData.questions.length !== 5)
         throw new Error("Must return exactly 5 questions");
-      }
 
       setQuestions(qData.questions);
     } catch (err) {
@@ -122,7 +112,6 @@ const LessonAnalyzer: React.FC = () => {
     }
 
     setAnalyzing(true);
-
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -131,10 +120,8 @@ const LessonAnalyzer: React.FC = () => {
       });
 
       const data = await res.json();
-
-      if (!res.ok || !data.analysis) {
+      if (!res.ok || !data.analysis)
         throw new Error(data.error || "Analysis failed");
-      }
 
       setAnalysis(data.analysis);
     } catch (err) {
@@ -148,43 +135,52 @@ const LessonAnalyzer: React.FC = () => {
   /* ================= UI ================= */
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex flex-col">
-
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-gray-100">
       {/* HEADER */}
       <header className="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Logo" className="h-10 w-10 object-contain" />
+          <Image
+            src="/nis.jpg"
+            alt="NIS Logo"
+            width={40}
+            height={40}
+            className="object-contain"
+          />
           <div>
-            <h1 className="text-lg font-bold text-gray-800">LessonAI</h1>
+            <h1 className="text-lg font-bold text-gray-800 leading-tight">
+              LessonAI
+            </h1>
             <p className="text-xs text-gray-500">Pre-Teaching Reflection Tool</p>
           </div>
         </div>
-        <div className="text-sm text-gray-500">Teacher Dashboard</div>
+        <div className="text-sm text-gray-500 font-medium">Teacher Dashboard</div>
       </header>
 
-      {/* MAIN */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 py-10 px-4">
         <div className="max-w-4xl mx-auto space-y-6">
-
-          {/* TITLE */}
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-800">Pre-Teaching Lesson Analyzer</h1>
-            <p className="text-gray-600 mt-2">Reflect, refine, and strengthen your lesson before teaching</p>
+            <h1 className="text-3xl font-bold text-gray-800">
+              Pre-Teaching Lesson Analyzer
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Reflect, refine, and strengthen your lesson before teaching
+            </p>
           </div>
 
           {/* UPLOAD */}
           <div className="bg-white shadow-md rounded-2xl p-6 border">
-            <h2 className="text-lg font-semibold mb-3 text-gray-700">1️⃣ Upload Your Lesson Plan</h2>
-
+            <h2 className="text-lg font-semibold mb-3 text-gray-700">
+              1️⃣ Upload Your Lesson Plan
+            </h2>
             <button
               type="button"
               onClick={openFileDialog}
-              className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
               disabled={uploading}
+              className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
             >
               {uploading ? "Uploading..." : "Upload File"}
             </button>
-
             <input
               ref={fileInputRef}
               type="file"
@@ -192,15 +188,16 @@ const LessonAnalyzer: React.FC = () => {
               hidden
               onChange={handleFileSelect}
             />
-
             {file && <p className="mt-3 text-sm text-gray-500">📄 {file.name}</p>}
           </div>
 
-          {/* LESSON PREVIEW */}
+          {/* PREVIEW */}
           {lessonText && (
             <div className="bg-white shadow-md rounded-2xl p-4 border">
               <div className="flex justify-between items-center">
-                <h2 className="text-md font-semibold text-gray-700">📖 Lesson Preview</h2>
+                <h2 className="text-md font-semibold text-gray-700">
+                  📖 Lesson Preview
+                </h2>
                 <button
                   onClick={() => setShowPreview(!showPreview)}
                   className="text-sm text-blue-600 hover:underline"
@@ -218,14 +215,20 @@ const LessonAnalyzer: React.FC = () => {
 
           {/* LOADING */}
           {loadingQuestions && (
-            <div className="text-center text-blue-600 font-medium">🤖 Generating reflective questions...</div>
+            <div className="text-center text-blue-600 font-medium">
+              🤖 Generating reflective questions...
+            </div>
           )}
 
           {/* QUESTIONS */}
           {questions.length === 5 && (
-            <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow-md rounded-2xl p-6 border space-y-6">
-              <h2 className="text-lg font-semibold text-gray-700">2️⃣ Reflect on Your Lesson</h2>
-
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="bg-white shadow-md rounded-2xl p-6 border space-y-6"
+            >
+              <h2 className="text-lg font-semibold text-gray-700">
+                2️⃣ Reflect on Your Lesson
+              </h2>
               {questions.map((q, index) => {
                 const fieldName = `Q${index + 1}` as keyof Answers;
                 return (
@@ -237,7 +240,8 @@ const LessonAnalyzer: React.FC = () => {
                         required: "This question must be answered",
                         minLength: {
                           value: 15,
-                          message: "Please write a more thoughtful response (min 15 characters)",
+                          message:
+                            "Please write a more thoughtful response (min 15 characters)",
                         },
                       })}
                       placeholder="Write your reflection..."
@@ -245,46 +249,49 @@ const LessonAnalyzer: React.FC = () => {
                       rows={3}
                     />
                     {errors[fieldName] && (
-                      <p className="text-red-500 text-sm mt-1">{errors[fieldName]?.message}</p>
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors[fieldName]?.message}
+                      </p>
                     )}
                   </div>
                 );
               })}
-
               <button
                 type="submit"
-                disabled={analyzing || !isValid}
-                className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50"
+                disabled={analyzing}
+                className="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition disabled:opacity-50"
               >
-                {analyzing ? "Analyzing your lesson..." : "✨ Generate AI Feedback"}
+                {analyzing
+                  ? "Analyzing..."
+                  : "Submit Reflection for AI Analysis"}
               </button>
             </form>
           )}
 
-          {/* RESULTS */}
+          {/* ANALYSIS */}
           {analysis && (
-            <div className="bg-white shadow-md rounded-2xl p-6 border">
-              <h2 className="text-xl font-bold mb-4 text-gray-800">🧠 AI Feedback</h2>
-              {(Object.keys(analysis.feedback) as (keyof Answers)[]).map((key, i) => (
-                <div key={key} className="mb-4 p-4 border rounded-lg bg-green-50">
-                  <h3 className="font-semibold text-green-800">{questions[i]?.key}</h3>
-                  <p className="text-sm text-gray-700 mt-1">{analysis.feedback[key]}</p>
+            <div className="bg-white shadow-lg rounded-2xl p-6 border-2 border-green-100">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">✨ AI Feedback</h2>
+              <div className="space-y-4">
+                {Object.entries(analysis.feedback).map(([key, val]) => (
+                  <div key={key}>
+                    <p className="font-semibold text-gray-700">{key}:</p>
+                    <p className="text-sm text-gray-600">{val}</p>
+                  </div>
+                ))}
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                  <p className="font-bold text-blue-800">General Suggestions:</p>
+                  <p className="text-sm text-blue-700">{analysis.generalSuggestions}</p>
                 </div>
-              ))}
-
-              <div className="mt-6 p-4 border rounded-lg bg-blue-50">
-                <h3 className="font-semibold text-blue-800">📌 General Suggestions</h3>
-                <p className="text-gray-700 mt-1">{analysis.generalSuggestions}</p>
               </div>
             </div>
           )}
-
         </div>
       </main>
 
       {/* FOOTER */}
-      <footer className="bg-white border-t text-center py-3 text-sm text-gray-500">
-        © {new Date().getFullYear()} LessonAI. All rights reserved.
+      <footer className="bg-white shadow-inner border-t py-4 text-center text-sm text-gray-500">
+        &copy; {new Date().getFullYear()} LessonAI. All rights reserved. Mahmud Choudhury & Begaim Adil
       </footer>
     </div>
   );
