@@ -137,24 +137,7 @@ const LessonAnalyzer: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-gray-100">
       {/* HEADER */}
-      <header className="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <Image
-            src="/nis.jpg"
-            alt="NIS Logo"
-            width={40}
-            height={40}
-            className="object-contain"
-          />
-          <div>
-            <h1 className="text-lg font-bold text-gray-800 leading-tight">
-              LessonAI
-            </h1>
-            <p className="text-xs text-gray-500">Pre-Teaching Reflection Tool</p>
-          </div>
-        </div>
-        <div className="text-sm text-gray-500 font-medium">Teacher Dashboard</div>
-      </header>
+      
 
       {/* MAIN CONTENT */}
       <main className="flex-1 py-10 px-4">

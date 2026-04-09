@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useAuth, UserButton } from "@clerk/nextjs";
 
 type Question = {
   category: "Notice" | "Appreciate" | "Probe" | "Connect" | "Extend";
@@ -17,22 +20,19 @@ type FeedbackResponse = {
   finalSuggestion: string;
 };
 
-const PostTeaching = () => {
+export default function PostTeaching() {
+  const { isSignedIn } = useAuth();
   const [files, setFiles] = useState<File[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const [isMounted, setIsMounted] = useState(false);
-
   const [feedback, setFeedback] = useState<FeedbackResponse | null>(null);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
-
+  const [isMounted, setIsMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  useEffect(() => setIsMounted(true), []);
 
   const openFileDialog = () => fileInputRef.current?.click();
 
@@ -48,150 +48,124 @@ const PostTeaching = () => {
 
     const formData = new FormData();
     selectedFiles.forEach((f) => formData.append("files", f));
-    formData.append("mode", "generate"); // ✅ IMPORTANT
+    formData.append("mode", "generate");
 
     setUploading(true);
-
     try {
-      const res = await fetch("/api/reflection/post", {
-        method: "POST",
-        body: formData,
-      });
-
+      const res = await fetch("/api/reflection/post", { method: "POST", body: formData });
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.error || "Upload failed");
-
       setQuestions(data.questions || []);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Upload failed";
-      console.error(err);
-      setError(message);
+      setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
   };
 
-  const handleAnswerChange = (category: string, value: string) => {
+  const handleAnswerChange = (category: string, value: string) =>
     setAnswers((prev) => ({ ...prev, [category]: value }));
-  };
 
   const handleSubmit = async () => {
     const invalid = questions.filter(
-      (q) =>
-        !answers[q.category]?.trim() ||
-        answers[q.category].trim().length < 15
+      (q) => !answers[q.category]?.trim() || answers[q.category].trim().length < 15
     );
-
-    if (invalid.length > 0) {
-      alert("Each answer must be at least 15 characters.");
-      return;
-    }
+    if (invalid.length > 0) return alert("Each answer must be at least 15 characters.");
 
     setLoadingFeedback(true);
-
     const formData = new FormData();
     files.forEach((f) => formData.append("files", f));
     formData.append("mode", "feedback");
     formData.append("answers", JSON.stringify(answers));
 
     try {
-      const res = await fetch("/api/reflection/post", {
-        method: "POST",
-        body: formData,
-      });
-
+      const res = await fetch("/api/reflection/post", { method: "POST", body: formData });
       const data: FeedbackResponse = await res.json();
-
-      if (!res.ok) throw new Error("Failed to generate feedback");
-
+      if (!res.ok) throw new Error();
       setFeedback(data);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to generate feedback";
-      console.error(err);
-      setError(message);
+    } catch {
+      setError("Failed to generate feedback");
     } finally {
       setLoadingFeedback(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-3xl mx-auto bg-white p-6 rounded-xl shadow">
-        <h1 className="text-2xl font-bold mb-4">
-          Post-Teaching Reflection
-        </h1>
-
-        <p className="text-gray-600 mb-6">
-          Upload lesson resources and reflect on your teaching.
+  if (!isSignedIn) {
+    return (
+      <div className="relative min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center px-6 text-center">
+        <div className="absolute top-6 left-6">
+          <Image src="/nis.jpg" alt="Logo" width={80} height={80} className="rounded-lg shadow-md" />
+        </div>
+        <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">Post-Teaching Reflection</h1>
+        <p className="max-w-xl text-gray-600 mb-8">
+          Upload your lesson resources and receive AI feedback to reflect on your teaching.
         </p>
+      </div>
+    );
+  }
 
-        <button
-          onClick={openFileDialog}
-          className="bg-blue-600 text-white px-5 py-2 rounded-lg"
-        >
-          {uploading ? "Uploading..." : "Upload Resources"}
-        </button>
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Navbar */}
+      <div className="flex justify-between items-center px-6 py-4 bg-white shadow-sm">
+        <div className="flex items-center gap-3">
+          <Image src="/nis.jpg" alt="Logo" width={40} height={40} className="rounded-md" />
+          <h1 className="font-semibold text-lg text-gray-700">Lesson AI Assistant</h1>
+        </div>
+        <div className="flex gap-6">
+          <Link href="/" className="text-blue-600 font-medium">Pre-Teaching</Link>
+          <Link href="/post-teaching" className="text-gray-600 hover:text-blue-600 font-medium transition">Post-Teaching</Link>
+        </div>
+        <UserButton />
+      </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept=".pdf,.docx"
-          hidden
-          onChange={handleFileSelect}
-        />
-
-        {isMounted && error && (
-          <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
-
-        {isMounted && files.length > 0 && (
-          <div className="mt-4 text-sm text-gray-600">
-            <p className="font-medium">Uploaded files:</p>
-            <ul className="list-disc ml-5">
-              {files.map((f, i) => (
-                <li key={i}>{f.name}</li>
-              ))}
+      {/* HERO */}
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Reflect on Your Teaching</h2>
+          <p className="text-gray-600 mb-4">
+            Upload your lesson resources and answer reflection questions to improve future lessons.
+          </p>
+          <button
+            onClick={openFileDialog}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl shadow"
+          >
+            {uploading ? "Uploading..." : "Upload Resources"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.docx"
+            hidden
+            onChange={handleFileSelect}
+          />
+          {error && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
+          {files.length > 0 && (
+            <ul className="mt-4 list-disc ml-5 text-sm text-gray-600">
+              {files.map((f, i) => <li key={i}>{f.name}</li>)}
             </ul>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* QUESTIONS */}
-        {isMounted && questions.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-lg font-semibold mb-3">
-              Reflection Questions
-            </h2>
-
-            <div className="space-y-4">
-              {questions.map((q, i) => (
-                <div key={i} className="p-4 border rounded-lg bg-gray-50">
-                  <p className="text-sm font-semibold text-blue-600">
-                    {q.category}
-                  </p>
-
-                  <p className="text-gray-800 mt-1">{q.question}</p>
-
-                  <textarea
-                    placeholder="Write your reflection (min 15 characters)..."
-                    className="mt-2 w-full p-2 border rounded"
-                    rows={4}
-                    value={answers[q.category] || ""}
-                    onChange={(e) =>
-                      handleAnswerChange(q.category, e.target.value)
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-
+        {/* REFLECTION QUESTIONS */}
+        {questions.length > 0 && (
+          <div className="bg-blue-50 rounded-2xl shadow-md p-6 mb-6">
+            {questions.map((q, i) => (
+              <div key={i} className="p-4 border rounded-xl bg-white mb-4">
+                <p className="text-sm font-semibold text-blue-600">{q.category}</p>
+                <p className="text-gray-800 mt-1">{q.question}</p>
+                <textarea
+                  className="mt-3 w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-200"
+                  rows={4}
+                  value={answers[q.category] || ""}
+                  onChange={(e) => handleAnswerChange(q.category, e.target.value)}
+                />
+              </div>
+            ))}
             <button
               onClick={handleSubmit}
-              className="mt-6 bg-green-600 text-white px-5 py-2 rounded-lg"
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl shadow"
             >
               Submit Reflections
             </button>
@@ -199,29 +173,18 @@ const PostTeaching = () => {
         )}
 
         {/* LOADING */}
-        {isMounted && loadingFeedback && (
-          <p className="mt-6">Generating AI feedback...</p>
-        )}
+        {loadingFeedback && <p className="mt-4 text-gray-600">Generating AI feedback...</p>}
 
         {/* FEEDBACK */}
-        {isMounted && feedback && (
-          <div className="mt-6 border p-4 rounded-lg bg-gray-50">
-            <h2 className="text-lg font-semibold mb-3">
-              AI Feedback
-            </h2>
-
-            <div className="space-y-3">
-              {feedback.feedback.map((f, i) => (
-                <div key={i}>
-                  <p className="font-semibold text-blue-600">
-                    {f.category}
-                  </p>
-                  <p className="text-gray-700">{f.comment}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 p-3 bg-green-50 border rounded">
+        {feedback && (
+          <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+            {feedback.feedback.map((f, i) => (
+              <div key={i} className="p-4 border rounded-lg mb-3">
+                <p className="font-semibold text-blue-600">{f.category}</p>
+                <p className="text-gray-700">{f.comment}</p>
+              </div>
+            ))}
+            <div className="p-4 bg-blue-50 border rounded-lg">
               <p className="font-semibold">Final Suggestion</p>
               <p>{feedback.finalSuggestion}</p>
             </div>
@@ -230,6 +193,4 @@ const PostTeaching = () => {
       </div>
     </div>
   );
-};
-
-export default PostTeaching;
+}
