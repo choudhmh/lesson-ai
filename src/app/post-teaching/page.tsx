@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAuth, UserButton } from "@clerk/nextjs";
 
+
 type Question = {
   category: "Notice" | "Appreciate" | "Probe" | "Connect" | "Extend";
   question: string;
@@ -33,6 +34,7 @@ export default function PostTeaching() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setIsMounted(true), []);
+  console.log("Signed in (Post-Teaching):", isSignedIn);
 
   const openFileDialog = () => fileInputRef.current?.click();
 
