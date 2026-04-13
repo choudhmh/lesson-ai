@@ -1,25 +1,31 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { extractTextFromPDF, extractTextFromDOCX } from "@/lib/fileParsers";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const file = formData.get("file") as File;
+    const file = formData.get("file");
 
-    if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    if (!(file instanceof File)) {
+      return NextResponse.json(
+        { error: "No file uploaded" },
+        { status: 400 }
+      );
+    }
 
     let extractedText = "";
 
-    if (file.name.endsWith(".docx")) {
-      extractedText = await extractTextFromDOCX(buffer);
-    } else if (file.name.endsWith(".pdf")) {
-      extractedText = await extractTextFromPDF(buffer);
+    const fileName = file.name.toLowerCase();
+
+    if (fileName.endsWith(".docx")) {
+      extractedText = await extractTextFromDOCX(file);
+    } else if (fileName.endsWith(".pdf")) {
+      extractedText = await extractTextFromPDF(file);
     } else {
-      return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Unsupported file type" },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({
@@ -29,6 +35,10 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Upload/extraction failed:", error);
-    return NextResponse.json({ error: "File upload or extraction failed" }, { status: 500 });
+
+    return NextResponse.json(
+      { error: "File upload or extraction failed" },
+      { status: 500 }
+    );
   }
 }
