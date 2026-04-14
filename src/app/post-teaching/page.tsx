@@ -34,6 +34,7 @@ export default function PostTeaching() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setIsMounted(true), []);
+  // Check if user is signed in on the post teaching page
   console.log("Signed in (Post-Teaching):", isSignedIn);
 
   const openFileDialog = () => fileInputRef.current?.click();
