@@ -7,7 +7,9 @@ import Link from "next/link";
 
 export default function Home() {
   const { isSignedIn } = useAuth();
-
+ // Check if user is signed in on the post teaching page
+ console.log("Signed in (Post-Teaching):", isSignedIn);
+ 
   // 🔒 NOT SIGNED IN
   if (!isSignedIn) {
     return (
