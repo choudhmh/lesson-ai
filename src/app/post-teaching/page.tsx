@@ -139,7 +139,7 @@ export default function PostTeaching() {
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.docx"
+            // accept=".pdf,.docx"
             hidden
             onChange={handleFileSelect}
           />
