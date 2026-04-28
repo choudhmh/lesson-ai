@@ -203,7 +203,7 @@ export default function PostTeaching() {
       <div className="p-6 max-w-5xl mx-auto">
         {/* UPLOAD */}
         <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-          <h2 className="text-2xl font-bold mb-3">Reflect on Your Teaching</h2>
+          <h1 className="text-2xl font-bold mb-3">Reflect on Your Teaching</h1>
 
           <button
             onClick={openFileDialog}
@@ -211,6 +211,8 @@ export default function PostTeaching() {
           >
             {uploading ? "Uploading..." : "Upload Resources"}
           </button>
+          
+       <h6 className="mt-4 text-sm text-gray-600">File size cannot exceed 4MB </h6>
 
           <input
             ref={fileInputRef}
