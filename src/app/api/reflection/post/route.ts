@@ -6,8 +6,9 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const mode = formData.get("mode");
-
-    const files = formData.getAll("files") as File[];
+    
+    const files = formData.getAll("files") as unknown as File[];
+    
     const combinedText = files
       .map((f) => `Processed file: ${f.name}`)
       .join("\n");

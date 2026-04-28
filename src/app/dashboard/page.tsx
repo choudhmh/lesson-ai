@@ -96,8 +96,7 @@ export default async function Dashboard({
   </Link>
 </div>
 
-      
-        <UserButton signOutUrl="/" />
+<UserButton />
       </div>
 
       {/* ================= CONTENT ================= */}
