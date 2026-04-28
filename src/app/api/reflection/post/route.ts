@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
+import { auth } from "@clerk/nextjs/server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -6,14 +8,13 @@ export async function POST(req: NextRequest) {
     const mode = formData.get("mode");
 
     const files = formData.getAll("files") as File[];
-
     const combinedText = files
       .map((f) => `Processed file: ${f.name}`)
       .join("\n");
 
-    // =========================
-    // MODE 1: GENERATE QUESTIONS
-    // =========================
+    /* =========================
+       MODE 1: GENERATE QUESTIONS
+    ========================= */
     if (mode === "generate") {
       const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -55,9 +56,9 @@ Return ONLY JSON:
       });
     }
 
-    // =========================
-    // MODE 2: FEEDBACK
-    // =========================
+    /* =========================
+       MODE 2: FEEDBACK + SAVE
+    ========================= */
     if (mode === "feedback") {
       const answersRaw = formData.get("answers") as string;
       const answers = JSON.parse(answersRaw);
@@ -75,13 +76,6 @@ Return ONLY JSON:
               role: "system",
               content: `
 You are an expert instructional coach.
-
-Based on lesson resources and teacher reflections:
-
-1. Give feedback for each category:
-Notice, Appreciate, Probe, Connect, Extend
-
-2. Then give ONE final actionable suggestion.
 
 Return ONLY JSON:
 {
@@ -113,11 +107,34 @@ ${JSON.stringify(answers, null, 2)}
       const data = await aiRes.json();
       const content = data.choices[0].message.content.replace(/```json|```/g, "");
 
-      return NextResponse.json(JSON.parse(content));
+      const parsed = JSON.parse(content);
+
+      /* =========================
+         SAVE TO SUPABASE (🔥 FIX)
+      ========================= */
+
+      const { userId } = await auth();
+
+      if (userId) {
+        const { error } = await supabase.from("reflections").insert({
+          user_id: userId,
+          lesson_text: combinedText,
+          questions: [],
+          answers,
+          feedback: parsed,
+          type: "post", // ⭐ THIS FIXES YOUR DASHBOARD ISSUE
+          created_at: new Date().toISOString(),
+        });
+
+        if (error) {
+          console.error("Supabase insert error:", error);
+        }
+      }
+
+      return NextResponse.json(parsed);
     }
 
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
-
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

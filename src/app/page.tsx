@@ -104,6 +104,12 @@ export default function Home() {
           >
             Post-Teaching
           </Link>
+
+          <Link
+    href="/dashboard"
+    className="text-gray-600 hover:text-blue-600 font-medium transition">
+    Dashboard
+  </Link>
         </div>
 
         {/* RIGHT: User */}

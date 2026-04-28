@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.8",
+    "@supabase/supabase-js": "^2.104.0",
     "@vercel/postgres": "^0.10.0",
     "formidable": "^3.5.4",
     "mammoth": "^1.12.0",

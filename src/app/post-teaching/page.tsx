@@ -52,6 +52,7 @@ export default function PostTeaching() {
     const formData = new FormData();
     selectedFiles.forEach((f) => formData.append("files", f));
     formData.append("mode", "generate");
+    formData.append("type", "post");
 
     setUploading(true);
     try {
@@ -80,6 +81,7 @@ export default function PostTeaching() {
     files.forEach((f) => formData.append("files", f));
     formData.append("mode", "feedback");
     formData.append("answers", JSON.stringify(answers));
+    formData.append("type", "post");
 
     try {
       const res = await fetch("/api/reflection/post", { method: "POST", body: formData });
@@ -116,8 +118,13 @@ export default function PostTeaching() {
           <h1 className="font-semibold text-lg text-gray-700">Lesson AI Assistant</h1>
         </div>
         <div className="flex gap-6">
-          <Link href="/" className="text-blue-600 font-medium">Pre-Teaching</Link>
-          <Link href="/post-teaching" className="text-gray-600 hover:text-blue-600 font-medium transition">Post-Teaching</Link>
+          <Link href="/">Pre-Teaching</Link>
+          <Link href="/post-teaching" className="text-blue-600 font-medium">Post-Teaching</Link>
+          <Link
+    href="/dashboard"
+    className="text-gray-600 hover:text-blue-600 font-medium transition">
+    Dashboard
+  </Link>
         </div>
         <UserButton />
       </div>
