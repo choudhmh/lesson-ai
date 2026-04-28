@@ -56,16 +56,43 @@ export default function PostTeaching() {
 
     setUploading(true);
     try {
-      const res = await fetch("/api/reflection/post", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
+     
+      
+      const tooLarge = files.some((f) => f.size > 4_000_000);
+    
+      if (tooLarge) {
+        alert("One or more files exceed 4MB limit.");
+        setUploading(false);
+        return;
+      }
+    
+      const res = await fetch("/api/reflection/post", {
+        method: "POST",
+        body: formData,
+      });
+    
+      let data;
+    
+      // ✅ Handle non-JSON (Vercel 413, etc.)
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text();
+        throw new Error(text || "Upload failed (non-JSON response)");
+      }
+    
+      // ✅ Handle HTTP errors properly
+      if (!res.ok) {
+        throw new Error(data?.error || "Upload failed");
+      }
+    
       setQuestions(data.questions || []);
+    
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
-  };
 
   const handleAnswerChange = (category: string, value: string) =>
     setAnswers((prev) => ({ ...prev, [category]: value }));
