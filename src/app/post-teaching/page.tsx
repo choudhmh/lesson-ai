@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAuth, UserButton } from "@clerk/nextjs";
 
+/* ================= TYPES ================= */
 
 type Question = {
   category: "Notice" | "Appreciate" | "Probe" | "Connect" | "Extend";
@@ -21,8 +22,11 @@ type FeedbackResponse = {
   finalSuggestion: string;
 };
 
+/* ================= COMPONENT ================= */
+
 export default function PostTeaching() {
   const { isSignedIn } = useAuth();
+
   const [files, setFiles] = useState<File[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -30,19 +34,27 @@ export default function PostTeaching() {
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<FeedbackResponse | null>(null);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => setIsMounted(true), []);
-  // Check if user is signed in on the post teaching page
-  console.log("Signed in (Post-Teaching):", isSignedIn);
+  useEffect(() => {}, []);
 
   const openFileDialog = () => fileInputRef.current?.click();
+
+  /* ================= FILE UPLOAD ================= */
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
 
     const selectedFiles = Array.from(e.target.files);
+
+    // ✅ FIX: validate BEFORE setting state / sending
+    const tooLarge = selectedFiles.some((f) => f.size > 4_000_000);
+    if (tooLarge) {
+      alert("One or more files exceed 4MB limit.");
+      return;
+    }
+
     setFiles(selectedFiles);
     setQuestions([]);
     setAnswers({});
@@ -55,55 +67,61 @@ export default function PostTeaching() {
     formData.append("type", "post");
 
     setUploading(true);
+
     try {
-     
-      
-      const tooLarge = files.some((f) => f.size > 4_000_000);
-    
-      if (tooLarge) {
-        alert("One or more files exceed 4MB limit.");
-        setUploading(false);
-        return;
-      }
-    
       const res = await fetch("/api/reflection/post", {
         method: "POST",
         body: formData,
       });
-    
-      let data;
-    
-      // ✅ Handle non-JSON (Vercel 413, etc.)
+
+      let data: unknown;
+
       try {
         data = await res.json();
       } catch {
         const text = await res.text();
         throw new Error(text || "Upload failed (non-JSON response)");
       }
-    
-      // ✅ Handle HTTP errors properly
+
       if (!res.ok) {
-        throw new Error(data?.error || "Upload failed");
+        const errMsg =
+          typeof data === "object" && data !== null && "error" in data
+            ? (data as { error?: string }).error
+            : "Upload failed";
+        throw new Error(errMsg);
       }
-    
-      setQuestions(data.questions || []);
-    
+
+      const parsed = data as { questions?: Question[] };
+      setQuestions(parsed.questions || []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
+  };
 
-  const handleAnswerChange = (category: string, value: string) =>
+  /* ================= ANSWERS ================= */
+
+  const handleAnswerChange = (category: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [category]: value }));
+  };
+
+  /* ================= SUBMIT ================= */
 
   const handleSubmit = async () => {
     const invalid = questions.filter(
-      (q) => !answers[q.category]?.trim() || answers[q.category].trim().length < 15
+      (q) =>
+        !answers[q.category]?.trim() ||
+        answers[q.category].trim().length < 15
     );
-    if (invalid.length > 0) return alert("Each answer must be at least 15 characters.");
+
+    if (invalid.length > 0) {
+      alert("Each answer must be at least 15 characters.");
+      return;
+    }
 
     setLoadingFeedback(true);
+
     const formData = new FormData();
     files.forEach((f) => formData.append("files", f));
     formData.append("mode", "feedback");
@@ -111,16 +129,33 @@ export default function PostTeaching() {
     formData.append("type", "post");
 
     try {
-      const res = await fetch("/api/reflection/post", { method: "POST", body: formData });
-      const data: FeedbackResponse = await res.json();
-      if (!res.ok) throw new Error();
-      setFeedback(data);
-    } catch {
-      setError("Failed to generate feedback");
+      const res = await fetch("/api/reflection/post", {
+        method: "POST",
+        body: formData,
+      });
+
+      let data: unknown;
+
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text();
+        throw new Error(text || "Feedback failed (non-JSON response)");
+      }
+
+      if (!res.ok) {
+        throw new Error("Failed to generate feedback");
+      }
+
+      setFeedback(data as FeedbackResponse);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to generate feedback");
     } finally {
       setLoadingFeedback(false);
     }
   };
+
+  /* ================= NOT SIGNED IN ================= */
 
   if (!isSignedIn) {
     return (
@@ -128,100 +163,119 @@ export default function PostTeaching() {
         <div className="absolute top-6 left-6">
           <Image src="/nis.jpg" alt="Logo" width={80} height={80} className="rounded-lg shadow-md" />
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">Post-Teaching Reflection</h1>
-        <p className="max-w-xl text-gray-600 mb-8">
-          Upload your lesson resources and receive AI feedback to reflect on your teaching.
+        <h1 className="text-4xl font-bold text-gray-800 mb-4">
+          Post-Teaching Reflection
+        </h1>
+        <p className="max-w-xl text-gray-600">
+          Upload your lesson resources and receive AI feedback.
         </p>
       </div>
     );
   }
 
+  /* ================= UI ================= */
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
+      {/* NAVBAR */}
       <div className="flex justify-between items-center px-6 py-4 bg-white shadow-sm">
         <div className="flex items-center gap-3">
           <Image src="/nis.jpg" alt="Logo" width={40} height={40} className="rounded-md" />
-          <h1 className="font-semibold text-lg text-gray-700">Lesson AI Assistant</h1>
+          <h1 className="font-semibold text-lg text-gray-700">
+            Lesson AI Assistant
+          </h1>
         </div>
+
         <div className="flex gap-6">
           <Link href="/">Pre-Teaching</Link>
-          <Link href="/post-teaching" className="text-blue-600 font-medium">Post-Teaching</Link>
-          <Link
-    href="/dashboard"
-    className="text-gray-600 hover:text-blue-600 font-medium transition">
-    Dashboard
-  </Link>
+          <Link href="/post-teaching" className="text-blue-600 font-medium">
+            Post-Teaching
+          </Link>
+          <Link href="/dashboard" className="text-gray-600 hover:text-blue-600">
+            Dashboard
+          </Link>
         </div>
+
         <UserButton />
       </div>
 
-      {/* HERO */}
+      {/* CONTENT */}
       <div className="p-6 max-w-5xl mx-auto">
+        {/* UPLOAD */}
         <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">Reflect on Your Teaching</h2>
-          <p className="text-gray-600 mb-4">
-            Upload your lesson resources and answer reflection questions to improve future lessons.
-          </p>
+          <h2 className="text-2xl font-bold mb-3">Reflect on Your Teaching</h2>
+
           <button
             onClick={openFileDialog}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl shadow"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl"
           >
             {uploading ? "Uploading..." : "Upload Resources"}
           </button>
+
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            // accept=".pdf,.docx"
             hidden
             onChange={handleFileSelect}
           />
-          {error && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-100 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+
           {files.length > 0 && (
-            <ul className="mt-4 list-disc ml-5 text-sm text-gray-600">
-              {files.map((f, i) => <li key={i}>{f.name}</li>)}
+            <ul className="mt-4 text-sm text-gray-600">
+              {files.map((f, i) => (
+                <li key={i}>{f.name}</li>
+              ))}
             </ul>
           )}
         </div>
 
-        {/* REFLECTION QUESTIONS */}
+        {/* QUESTIONS */}
         {questions.length > 0 && (
-          <div className="bg-blue-50 rounded-2xl shadow-md p-6 mb-6">
+          <div className="bg-blue-50 rounded-2xl p-6 mb-6">
             {questions.map((q, i) => (
-              <div key={i} className="p-4 border rounded-xl bg-white mb-4">
-                <p className="text-sm font-semibold text-blue-600">{q.category}</p>
-                <p className="text-gray-800 mt-1">{q.question}</p>
+              <div key={i} className="mb-4 bg-white p-4 rounded-xl border">
+                <p className="text-blue-600 font-semibold">{q.category}</p>
+                <p>{q.question}</p>
+
                 <textarea
-                  className="mt-3 w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-200"
+                  className="mt-3 w-full p-3 border rounded-lg"
                   rows={4}
                   value={answers[q.category] || ""}
-                  onChange={(e) => handleAnswerChange(q.category, e.target.value)}
+                  onChange={(e) =>
+                    handleAnswerChange(q.category, e.target.value)
+                  }
                 />
               </div>
             ))}
+
             <button
               onClick={handleSubmit}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl shadow"
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl"
             >
               Submit Reflections
             </button>
           </div>
         )}
 
-        {/* LOADING */}
-        {loadingFeedback && <p className="mt-4 text-gray-600">Generating AI feedback...</p>}
-
         {/* FEEDBACK */}
+        {loadingFeedback && <p>Generating feedback...</p>}
+
         {feedback && (
-          <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+          <div className="bg-white rounded-2xl p-6">
             {feedback.feedback.map((f, i) => (
-              <div key={i} className="p-4 border rounded-lg mb-3">
+              <div key={i} className="mb-3">
                 <p className="font-semibold text-blue-600">{f.category}</p>
-                <p className="text-gray-700">{f.comment}</p>
+                <p>{f.comment}</p>
               </div>
             ))}
-            <div className="p-4 bg-blue-50 border rounded-lg">
+
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
               <p className="font-semibold">Final Suggestion</p>
               <p>{feedback.finalSuggestion}</p>
             </div>
