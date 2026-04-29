@@ -5,6 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 
+/* ================= TYPES ================= */
+
 interface Reflection {
   id: string;
   lesson_text: string;
@@ -12,16 +14,19 @@ interface Reflection {
   created_at: string;
 }
 
+/* ================= PAGE ================= */
+
 export default async function Dashboard({
   searchParams,
 }: {
-  searchParams?: { type?: string };
+  searchParams: Promise<{ type?: string }>; // ✅ FIX
 }) {
   const { userId } = await auth();
 
   if (!userId) redirect("/sign-in");
 
-  const filterType = searchParams?.type;
+  // ✅ FIX: unwrap searchParams
+  const { type: filterType } = await searchParams;
 
   let query = supabase
     .from("reflections")
@@ -37,8 +42,8 @@ export default async function Dashboard({
   const reflections = (data as Reflection[]) || [];
 
   const total = reflections.length;
-  const pre = reflections.filter(r => r.type === "pre").length;
-  const post = reflections.filter(r => r.type === "post").length;
+  const pre = reflections.filter((r) => r.type === "pre").length;
+  const post = reflections.filter((r) => r.type === "post").length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -60,43 +65,36 @@ export default async function Dashboard({
           </h1>
         </div>
 
-     {/* CENTER LINKS */}
-<div className="flex gap-6">
-  <Link
-    href="/"
-    className={`font-medium transition ${
-      filterType === "post"
-        ? "text-blue-600"
-        : "text-gray-600 hover:text-blue-600"
-    }`}
-  >
-    Pre-Teaching
-  </Link>
+        {/* CENTER LINKS */}
+        <div className="flex gap-6">
+          <Link
+            href="/"
+            className="text-gray-600 hover:text-blue-600 font-medium transition"
+          >
+            Pre-Teaching
+          </Link>
 
-  <Link
-    href="/post-teaching"
-    className={`font-medium transition ${
-      filterType === "post"
-        ? "text-blue-600"
-        : "text-gray-600 hover:text-blue-600"
-    }`}
-  >
-    Post-Teaching
-  </Link>
+          <Link
+            href="/post-teaching"
+            className="text-gray-600 hover:text-blue-600 font-medium transition"
+          >
+            Post-Teaching
+          </Link>
 
-  <Link
-    href="/dashboard"
-    className={`font-medium transition ${
-      !filterType
-        ? "text-blue-600"
-        : "text-gray-600 hover:text-blue-600"
-    }`}
-  >
-    Dashboard
-  </Link>
-</div>
+          <Link
+            href="/dashboard"
+            className={`font-medium transition ${
+              !filterType
+                ? "text-blue-600"
+                : "text-gray-600 hover:text-blue-600"
+            }`}
+          >
+            Dashboard
+          </Link>
+        </div>
 
-<UserButton />
+        {/* RIGHT */}
+        <UserButton />
       </div>
 
       {/* ================= CONTENT ================= */}
@@ -114,25 +112,22 @@ export default async function Dashboard({
           </div>
 
           {/* STATS */}
-          <div className="flex gap-3 mb-10">
+          <div className="flex gap-4 mb-10">
+            <div className="w-[180px] bg-white border shadow-sm rounded-xl px-4 py-3">
+              <p className="text-xs text-gray-500">Total Reflections</p>
+              <p className="text-lg font-semibold text-gray-900">{total}</p>
+            </div>
 
-<div className="w-[180px] bg-white border shadow-sm rounded-xl px-4 py-3 flex flex-col gap-1">
-  <p className="text-[11px] text-gray-500">Total Reflections</p>
-  <p className="text-lg font-semibold text-gray-900">{total}</p>
-</div>
+            <div className="w-[180px] bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+              <p className="text-xs text-blue-600">Pre-Teaching</p>
+              <p className="text-lg font-semibold text-blue-700">{pre}</p>
+            </div>
 
-<div className="w-[180px] bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex flex-col gap-1">
-  <p className="text-[11px] text-blue-600">Pre-Teaching</p>
-  <p className="text-lg font-semibold text-blue-700">{pre}</p>
-</div>
-
-<div className="w-[180px] bg-green-50 border border-blue-100 rounded-xl px-4 py-3 flex flex-col gap-1">
-  <p className="text-[11px] text-green-600">Post-Teaching</p>
-  <p className="text-lg font-semibold text-green-700">{post}</p>
-</div>
-
-</div>
-          <br></br>
+            <div className="w-[180px] bg-green-50 border border-green-100 rounded-xl px-4 py-3">
+              <p className="text-xs text-green-600">Post-Teaching</p>
+              <p className="text-lg font-semibold text-green-700">{post}</p>
+            </div>
+          </div>
 
           {/* LIST */}
           <div className="space-y-4">
@@ -153,7 +148,9 @@ export default async function Dashboard({
                         : "bg-green-100 text-green-700"
                     }`}
                   >
-                    {item.type}
+                    {item.type === "pre"
+                      ? "Pre-Teaching"
+                      : "Post-Teaching"}
                   </span>
                 </div>
 
@@ -164,7 +161,7 @@ export default async function Dashboard({
                 <div className="mt-4 flex justify-end">
                   <Link
                     href={`/dashboard/${item.id}`}
-                    className="text-sm font-medium text-black hover:text-blue-600"
+                    className="text-sm font-medium text-gray-800 hover:text-blue-600"
                   >
                     View analysis →
                   </Link>

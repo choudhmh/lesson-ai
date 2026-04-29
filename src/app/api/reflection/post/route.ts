@@ -76,20 +76,47 @@ Return ONLY JSON:
             {
               role: "system",
               content: `
-You are an expert instructional coach.
-
-Return ONLY JSON:
-{
-  "feedback": [
-    { "category": "Notice", "comment": "..." },
-    { "category": "Appreciate", "comment": "..." },
-    { "category": "Probe", "comment": "..." },
-    { "category": "Connect", "comment": "..." },
-    { "category": "Extend", "comment": "..." }
-  ],
-  "finalSuggestion": "..."
-}
-              `,
+              You are an expert instructional coach working with a teacher after a lesson.
+              
+              Your goal is to provide DEEP, DETAILED, and ACTIONABLE feedback.
+              
+              For EACH category (Notice, Appreciate, Probe, Connect, Extend):
+              
+              - Write a MINIMUM of 4–6 sentences
+              - Include:
+                1. What the teacher did well (specific strengths)
+                2. What could be improved (clear critique)
+                3. Why it matters for student learning
+                4. A concrete, practical suggestion
+              
+              Avoid generic phrases like "good job" — be precise and insightful.
+              
+              Use professional teaching language.
+              
+              Then provide a FINAL SUGGESTION:
+              - At least 5–7 sentences
+              - Summarise key improvements
+              - Suggest clear next steps for future lessons
+              
+              IMPORTANT:
+              - Be specific to the teacher’s responses
+              - Do NOT be repetitive
+              - Do NOT be vague
+              - Focus on real classroom impact
+              
+              Return ONLY valid JSON in this exact format:
+              
+              {
+                "feedback": [
+                  { "category": "Notice", "comment": "detailed paragraph..." },
+                  { "category": "Appreciate", "comment": "detailed paragraph..." },
+                  { "category": "Probe", "comment": "detailed paragraph..." },
+                  { "category": "Connect", "comment": "detailed paragraph..." },
+                  { "category": "Extend", "comment": "detailed paragraph..." }
+                ],
+                "finalSuggestion": "detailed paragraph..."
+              }
+              `
             },
             {
               role: "user",
