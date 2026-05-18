@@ -104,39 +104,48 @@ export async function POST(req: NextRequest) {
     /* ================= OPENAI PROMPT ================= */
 
     const prompt = `
-You are an expert instructional coach.
-
-Lesson Plan:
-${lessonText}
-
-Reflection Questions:
-${JSON.stringify(formattedQuestions, null, 2)}
-
-Teacher Answers:
-${JSON.stringify(answers, null, 2)}
-
-Each question belongs to:
-Notice, Appreciate, Probe, Connect, Extend.
-
-TASK:
-- Analyse each answer deeply
-- Align feedback to category meaning
-- Provide strengths and improvements
-- Be specific and actionable
-
-Return ONLY valid JSON:
-
-{
-  "feedback": {
-    "Q1": "",
-    "Q2": "",
-    "Q3": "",
-    "Q4": "",
-    "Q5": ""
-  },
-  "generalSuggestions": ""
-}
-`;
+    Сіз тәжірибелі педагогикалық коучсыз.
+    
+    Сабақ жоспарына негізделген 5 рефлексия сұрағын қазақ тілінде құрастырыңыз.
+    
+    Әр сұрақ келесі категориялардың біріне сәйкес болуы керек:
+    - Notice
+    - Appreciate
+    - Probe
+    - Connect
+    - Extend
+    
+    МАҢЫЗДЫ:
+    - Барлық сұрақтар ТЕК қазақ тілінде болсын
+    - Сұрақтар мұғалімнің терең рефлексия жасауына көмектессін
+    - Сұрақтар нақты, кәсіби және түсінікті болсын
+    - Әр сұрақ кемінде 1-2 сөйлемнен тұрсын
+    
+    ТЕК МЫНАДАЙ JSON ҚАЙТАРЫҢЫЗ:
+    
+    [
+      {
+        "key": "Notice",
+        "question": "Сабақ жоспарыңызда қандай оқыту стратегиялары айқын көрінеді және олардың оқушыларға әсері қандай болады деп ойлайсыз?"
+      },
+      {
+        "key": "Appreciate",
+        "question": "Сабақ жоспарыңыздың қай бөліктері оқушылардың қызығушылығын арттырады деп ойлайсыз және неліктен?"
+      },
+      {
+        "key": "Probe",
+        "question": "Сабақ барысында қандай қиындықтар туындауы мүмкін және оларды қалай шешуді жоспарлап отырсыз?"
+      },
+      {
+        "key": "Connect",
+        "question": "Бұл сабақ оқушылардың алдыңғы білімдерімен және өмірлік тәжірибесімен қалай байланысады?"
+      },
+      {
+        "key": "Extend",
+        "question": "Оқушылардың тереңірек ойлауын дамыту үшін сабақты тағы қалай кеңейтуге болады?"
+      }
+    ]
+    `;
 
     /* ================= OPENAI CALL ================= */
 

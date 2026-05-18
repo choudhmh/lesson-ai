@@ -2,38 +2,68 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { auth } from "@clerk/nextjs/server";
 
+type QuestionItem = {
+  category: "Notice" | "Appreciate" | "Probe" | "Connect" | "Extend";
+  question: string;
+};
+
+type OpenAIResponse = {
+  choices: {
+    message: {
+      content: string;
+    };
+  }[];
+};
+
+function cleanJson(text: string) {
+  return text.replace(/```json|```/g, "").trim();
+}
+
+function hasEnglish(text: string) {
+  return /[A-Za-z]{4,}/.test(text);
+}
+
+/* =========================
+   MAIN ROUTE
+========================= */
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const mode = formData.get("mode");
-    
-    const files = formData.getAll("files") as unknown as File[];
-    
-    const combinedText = files
-      .map((f) => `Processed file: ${f.name}`)
-      .join("\n");
+    const mode = formData.get("mode")?.toString();
+    const files = formData.getAll("files") as File[];
+
+    const combinedText = files.map((f) => `File: ${f.name}`).join("\n");
 
     /* =========================
        MODE 1: GENERATE QUESTIONS
     ========================= */
+
     if (mode === "generate") {
-      const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4.1-mini",
-          messages: [
-            {
-              role: "system",
-              content: `
-You are an expert teacher coach.
+      const generate = async () => {
+        return fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4.1-mini",
+            temperature: 0,
+            messages: [
+              {
+                role: "system",
+                content: `
+СІЗ — ТЕК ҚАЗАҚ ТІЛІНДЕ ЖАУАП БЕРЕТІН ПЕДАГОГИКАЛЫҚ КОУЧСЫЗ.
 
-Generate 5 reflection questions based on lesson materials.
+🚨 ҚАТАҢ ЕРЕЖЕ:
+- ТЕК қазақ тілі
+- ЕШҚАНДАЙ ағылшын сөз жоқ
 
-Return ONLY JSON:
+МІНДЕТ:
+5 рефлексия сұрағы
+
+JSON:
 [
   { "category": "Notice", "question": "..." },
   { "category": "Appreciate", "question": "..." },
@@ -41,25 +71,65 @@ Return ONLY JSON:
   { "category": "Connect", "question": "..." },
   { "category": "Extend", "question": "..." }
 ]
-              `,
-            },
-            { role: "user", content: combinedText },
-          ],
-        }),
-      });
+`.trim(),
+              },
+              {
+                role: "user",
+                content: `
+ТЕК ҚАЗАҚША.
 
-      const data = await aiRes.json();
-      const content = data.choices[0].message.content.replace(/```json|```/g, "");
+Lesson:
+${combinedText}
+                `.trim(),
+              },
+            ],
+          }),
+        });
+      };
+
+      let aiRes = await generate();
+      let data: OpenAIResponse = await aiRes.json();
+
+      let content = cleanJson(data?.choices?.[0]?.message?.content || "");
+      let parsed: QuestionItem[];
+
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid JSON from AI" },
+          { status: 500 }
+        );
+      }
+
+      // 🔥 AUTO FIX PIPELINE
+      if (hasEnglish(JSON.stringify(parsed))) {
+        // retry ONCE automatically
+        aiRes = await generate();
+        data = await aiRes.json();
+        content = cleanJson(data?.choices?.[0]?.message?.content || "");
+
+        parsed = JSON.parse(content);
+
+        // final safety check
+        if (hasEnglish(JSON.stringify(parsed))) {
+          return NextResponse.json(
+            { error: "English still detected after retry" },
+            { status: 500 }
+          );
+        }
+      }
 
       return NextResponse.json({
         combinedText,
-        questions: JSON.parse(content),
+        questions: parsed,
       });
     }
 
     /* =========================
-       MODE 2: FEEDBACK + SAVE
+       MODE 2: FEEDBACK
     ========================= */
+
     if (mode === "feedback") {
       const answersRaw = formData.get("answers") as string;
       const answers = JSON.parse(answersRaw);
@@ -72,98 +142,65 @@ Return ONLY JSON:
         },
         body: JSON.stringify({
           model: "gpt-4.1-mini",
+          temperature: 0,
           messages: [
             {
               role: "system",
               content: `
-              You are an expert instructional coach working with a teacher after a lesson.
-              
-              Your goal is to provide DEEP, DETAILED, and ACTIONABLE feedback.
-              
-              For EACH category (Notice, Appreciate, Probe, Connect, Extend):
-              
-              - Write a MINIMUM of 4–6 sentences
-              - Include:
-                1. What the teacher did well (specific strengths)
-                2. What could be improved (clear critique)
-                3. Why it matters for student learning
-                4. A concrete, practical suggestion
-              
-              Avoid generic phrases like "good job" — be precise and insightful.
-              
-              Use professional teaching language.
-              
-              Then provide a FINAL SUGGESTION:
-              - At least 5–7 sentences
-              - Summarise key improvements
-              - Suggest clear next steps for future lessons
-              
-              IMPORTANT:
-              - Be specific to the teacher’s responses
-              - Do NOT be repetitive
-              - Do NOT be vague
-              - Focus on real classroom impact
-              
-              Return ONLY valid JSON in this exact format:
-              
-              {
-                "feedback": [
-                  { "category": "Notice", "comment": "detailed paragraph..." },
-                  { "category": "Appreciate", "comment": "detailed paragraph..." },
-                  { "category": "Probe", "comment": "detailed paragraph..." },
-                  { "category": "Connect", "comment": "detailed paragraph..." },
-                  { "category": "Extend", "comment": "detailed paragraph..." }
-                ],
-                "finalSuggestion": "detailed paragraph..."
-              }
-              `
+СІЗ — ТЕК ҚАЗАҚ ТІЛІНДЕ ЖАУАП БЕРЕТІН ПЕДАГОГИКАЛЫҚ КОУЧСЫЗ.
+
+Барлық жауап 100% қазақ тілінде болуы керек.
+
+JSON ONLY:
+{
+  "feedback": [
+    { "category": "Notice", "comment": "..." },
+    { "category": "Appreciate", "comment": "..." },
+    { "category": "Probe", "comment": "..." },
+    { "category": "Connect", "comment": "..." },
+    { "category": "Extend", "comment": "..." }
+  ],
+  "finalSuggestion": "..."
+}
+`.trim(),
             },
             {
               role: "user",
               content: `
-Lesson Materials:
+Lesson:
 ${combinedText}
 
-Teacher Reflections:
-${JSON.stringify(answers, null, 2)}
-              `,
+Answers:
+${JSON.stringify(answers)}
+              `.trim(),
             },
           ],
         }),
       });
 
       const data = await aiRes.json();
-      const content = data.choices[0].message.content.replace(/```json|```/g, "");
+      const content = cleanJson(data?.choices?.[0]?.message?.content || "");
 
       const parsed = JSON.parse(content);
-
-      /* =========================
-         SAVE TO SUPABASE (🔥 FIX)
-      ========================= */
 
       const { userId } = await auth();
 
       if (userId) {
-        const { error } = await supabase.from("reflections").insert({
+        await supabase.from("reflections").insert({
           user_id: userId,
           lesson_text: combinedText,
-          questions: [],
           answers,
           feedback: parsed,
-          type: "post", // ⭐ THIS FIXES YOUR DASHBOARD ISSUE
+          type: "post",
           created_at: new Date().toISOString(),
         });
-
-        if (error) {
-          console.error("Supabase insert error:", error);
-        }
       }
 
       return NextResponse.json(parsed);
     }
 
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
