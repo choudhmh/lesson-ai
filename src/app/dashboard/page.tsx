@@ -1,103 +1,177 @@
-"use client";
-
-import { useAuth, SignInButton, UserButton } from "@clerk/nextjs";
-import LessonAnalyzer from "@/components/LessonAnalyzer";
-import Image from "next/image";
+import { auth } from "@clerk/nextjs/server";
+import { supabase } from "@/lib/supabase";
+import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import { UserButton } from "@clerk/nextjs";
 
-export default function Home() {
-  const { isSignedIn } = useAuth();
+/* ================= TYPES ================= */
 
-  console.log("Signed in (Post-Teaching):", isSignedIn);
+interface Reflection {
+  id: string;
+  lesson_text: string;
+  type: "pre" | "post";
+  created_at: string;
+}
 
-  if (!isSignedIn) {
-    return (
-      <div className="relative min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center px-6 text-center">
+/* ================= PAGE ================= */
 
-        <div className="absolute top-6 left-6">
-          <Image
-            src="/nis.jpg"
-            alt="Логотип"
-            width={80}
-            height={80}
-            className="rounded-lg shadow-md"
-          />
-        </div>
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>; // ✅ FIX
+}) {
+  const { userId } = await auth();
 
-        <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-          AI арқылы тиімді оқыту
-        </h1>
+  if (!userId) redirect("/sign-in");
 
-        <p className="max-w-xl text-gray-600 mb-8">
-          Сабақ жоспарын жақсартыңыз, сабаққа дейін AI кері байланыс алыңыз және
-          сабақтан кейін рефлексия жасаңыз.
-        </p>
+  // ✅ FIX: unwrap searchParams
+  const { type: filterType } = await searchParams;
 
-        <SignInButton mode="modal">
-          <button className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-lg shadow-lg transition">
-            Мұғалім ретінде кіру
-          </button>
-        </SignInButton>
+  let query = supabase
+    .from("reflections")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
 
-        <div className="mt-16 grid md:grid-cols-3 gap-6 max-w-4xl">
-          {[
-            {
-              title: "1. Жоспарлау",
-              desc: "Сабақ жоспарын жүктеңіз және ұсыныстар алыңыз",
-            },
-            {
-              title: "2. Сабақ өткізу",
-              desc: "Сабақты сенімді түрде өткізіңіз",
-            },
-            {
-              title: "3. Рефлексия",
-              desc: "AI арқылы кері байланыс алыңыз",
-            },
-          ].map((step, i) => (
-            <div key={i} className="bg-white p-6 rounded-2xl shadow-md">
-              <h3 className="font-semibold text-lg mb-2">{step.title}</h3>
-              <p className="text-gray-500 text-sm">{step.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  if (filterType === "pre" || filterType === "post") {
+    query = query.eq("type", filterType);
   }
+
+  const { data } = await query;
+  const reflections = (data as Reflection[]) || [];
+
+  const total = reflections.length;
+  const pre = reflections.filter((r) => r.type === "pre").length;
+  const post = reflections.filter((r) => r.type === "post").length;
 
   return (
     <div className="min-h-screen bg-gray-50">
 
-      <div className="flex justify-between items-center px-6 py-4 bg-white shadow-sm">
+      {/* ================= NAVBAR ================= */}
+      <div className="flex justify-between items-center px-6 py-4 bg-white shadow-sm sticky top-0 z-50">
 
+        {/* LEFT */}
         <div className="flex items-center gap-3">
-          <Image src="/nis.jpg" alt="Логотип" width={40} height={40} className="rounded-md" />
+          <Image
+            src="/nis.jpg"
+            alt="Logo"
+            width={40}
+            height={40}
+            className="rounded-md"
+          />
           <h1 className="font-semibold text-lg text-gray-700">
-            Сабақ AI көмекшісі
+            Lesson AI Assistant
           </h1>
         </div>
 
+        {/* CENTER LINKS */}
         <div className="flex gap-6">
-          <Link href="/" className="text-blue-600 font-medium">
-            Сабаққа дейін
+          <Link
+            href="/"
+            className="text-gray-600 hover:text-blue-600 font-medium transition"
+          >
+            Pre-Teaching
           </Link>
 
-          <Link href="/post-teaching" className="text-gray-600 hover:text-blue-600">
-            Сабақтан кейін
+          <Link
+            href="/post-teaching"
+            className="text-gray-600 hover:text-blue-600 font-medium transition"
+          >
+            Post-Teaching
           </Link>
 
-          <Link href="/dashboard" className="text-gray-600 hover:text-blue-600">
-            Бақылау тақтасы
+          <Link
+            href="/dashboard"
+            className={`font-medium transition ${
+              !filterType
+                ? "text-blue-600"
+                : "text-gray-600 hover:text-blue-600"
+            }`}
+          >
+            Dashboard
           </Link>
         </div>
 
+        {/* RIGHT */}
         <UserButton />
       </div>
 
-      <div className="p-6 max-w-5xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <LessonAnalyzer />
+      {/* ================= CONTENT ================= */}
+      <main className="px-6 py-10">
+        <div className="max-w-6xl mx-auto">
+
+          {/* HEADER */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-semibold text-gray-900">
+              Your Teaching Dashboard
+            </h1>
+            <p className="text-gray-500 mt-1">
+              Track your reflections and AI feedback over time
+            </p>
+          </div>
+
+          {/* STATS */}
+          <div className="flex gap-4 mb-10">
+            <div className="w-[180px] bg-white border shadow-sm rounded-xl px-4 py-3">
+              <p className="text-xs text-gray-500">Total Reflections</p>
+              <p className="text-lg font-semibold text-gray-900">{total}</p>
+            </div>
+
+            <div className="w-[180px] bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+              <p className="text-xs text-blue-600">Pre-Teaching</p>
+              <p className="text-lg font-semibold text-blue-700">{pre}</p>
+            </div>
+
+            <div className="w-[180px] bg-green-50 border border-green-100 rounded-xl px-4 py-3">
+              <p className="text-xs text-green-600">Post-Teaching</p>
+              <p className="text-lg font-semibold text-green-700">{post}</p>
+            </div>
+          </div>
+
+          {/* LIST */}
+          <div className="space-y-4">
+            {reflections.map((item) => (
+              <div
+                key={item.id}
+                className="bg-white rounded-2xl border p-5 shadow-sm hover:shadow-md transition"
+              >
+                <div className="flex justify-between text-xs text-gray-400 mb-2">
+                  <span>
+                    {new Date(item.created_at).toLocaleDateString()}
+                  </span>
+
+                  <span
+                    className={`px-3 py-1 rounded-full font-medium ${
+                      item.type === "pre"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {item.type === "pre"
+                      ? "Pre-Teaching"
+                      : "Post-Teaching"}
+                  </span>
+                </div>
+
+                <p className="text-sm text-gray-700 line-clamp-2">
+                  {item.lesson_text}
+                </p>
+
+                <div className="mt-4 flex justify-end">
+                  <Link
+                    href={`/dashboard/${item.id}`}
+                    className="text-sm font-medium text-gray-800 hover:text-blue-600"
+                  >
+                    View analysis →
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+
         </div>
-      </div>
+      </main>
     </div>
   );
 }
