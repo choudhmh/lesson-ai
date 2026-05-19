@@ -1,232 +1,154 @@
-import { supabase } from "@/lib/supabase";
-import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
+import { supabase } from "@/lib/supabase";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 
 /* ================= TYPES ================= */
 
-interface QuestionItem {
-  key: "Notice" | "Appreciate" | "Probe" | "Connect" | "Extend";
-  question: string;
-}
-
-type PreFeedback = {
-  feedback: Record<string, string>;
-  generalSuggestions: string;
-};
-
-type PostFeedback = {
-  feedback: { category: string; comment: string }[];
-  finalSuggestion: string;
-};
-
-type ReflectionFeedback = PreFeedback | PostFeedback;
-
 interface Reflection {
   id: string;
-  user_id: string;
   lesson_text: string;
-  questions: QuestionItem[];
-  answers: Record<string, string>;
-  feedback: ReflectionFeedback;
   type: "pre" | "post";
   created_at: string;
 }
 
 /* ================= PAGE ================= */
 
-export default async function ReflectionDetail({
-  params,
+export default async function Dashboard({
+  searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  searchParams: Promise<{ type?: string }>;
 }) {
-  const { id } = await params;
-
   const { userId } = await auth();
 
-  const { data, error } = await supabase
+  if (!userId) redirect("/sign-in");
+
+  const { type: filterType } = await searchParams;
+
+  let query = supabase
     .from("reflections")
     .select("*")
-    .eq("id", id)
-    .single();
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
 
-  if (error || !data) return notFound();
+  if (filterType === "pre" || filterType === "post") {
+    query = query.eq("type", filterType);
+  }
 
-  const reflection = data as Reflection;
+  const { data } = await query;
+  const reflections = (data as Reflection[]) || [];
 
-  if (reflection.user_id !== userId) return notFound();
-
-  const isPost =
-    Array.isArray((reflection.feedback as PostFeedback)?.feedback);
+  const total = reflections.length;
+  const pre = reflections.filter((r) => r.type === "pre").length;
+  const post = reflections.filter((r) => r.type === "post").length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-100">
+    <div className="min-h-screen bg-gray-50">
 
-      {/* ================= FULL WIDTH NAVBAR ================= */}
-      <div className="w-full flex justify-between items-center px-6 py-4 bg-white shadow-sm">
+      {/* NAVBAR */}
+      <div className="flex justify-between items-center px-6 py-4 bg-white shadow-sm sticky top-0 z-50">
 
-        {/* LEFT */}
         <div className="flex items-center gap-3">
-          <Image
-            src="/nis.jpg"
-            alt="Logo"
-            width={40}
-            height={40}
-            className="rounded-md"
-          />
+          <Image src="/nis.jpg" alt="Logo" width={40} height={40} className="rounded-md" />
           <h1 className="font-semibold text-lg text-gray-700">
-            Lesson AI Assistant
+            Сабақ AI көмекшісі
           </h1>
         </div>
 
-        {/* CENTER LINKS */}
         <div className="flex gap-6">
-          <Link href="/" className="text-gray-600 hover:text-blue-600">
-            Pre-Teaching
+          <Link href="/" className="text-gray-600 hover:text-blue-600 font-medium">
+            Сабаққа дейін
           </Link>
 
-          <Link
-            href="/post-teaching"
-            className={`${
-              reflection.type === "post"
-                ? "text-blue-600 font-medium"
-                : "text-gray-600 hover:text-blue-600"
-            }`}
-          >
-            Post-Teaching
+          <Link href="/post-teaching" className="text-gray-600 hover:text-blue-600 font-medium">
+            Сабақтан кейін
           </Link>
 
           <Link
             href="/dashboard"
-            className="text-gray-600 hover:text-blue-600"
+            className={`font-medium ${
+              !filterType ? "text-blue-600" : "text-gray-600 hover:text-blue-600"
+            }`}
           >
-            Dashboard
+            Бақылау тақтасы
           </Link>
         </div>
 
-        {/* RIGHT */}
         <UserButton />
       </div>
 
-      {/* ================= PAGE CONTENT ================= */}
-      <div className="max-w-5xl mx-auto py-10 px-4 space-y-8">
+      {/* CONTENT */}
+      <main className="px-6 py-10">
+        <div className="max-w-6xl mx-auto">
 
-        {/* HEADER */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">
-              Reflection Detail
+          {/* HEADER */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-semibold text-gray-900">
+              Оқыту нәтижелерінің бақылау тақтасы
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Review your lesson reflection and AI feedback
+            <p className="text-gray-500 mt-1">
+              Уақыт бойынша рефлексиялар мен AI кері байланысты бақылаңыз
             </p>
           </div>
 
-          <span
-            className={`text-xs px-3 py-1 rounded-full font-medium ${
-              reflection.type === "pre"
-                ? "bg-blue-100 text-blue-700"
-                : "bg-green-100 text-green-700"
-            }`}
-          >
-            {reflection.type === "pre" ? "Pre-Teaching" : "Post-Teaching"}
-          </span>
-        </div>
+          {/* STATS */}
+          <div className="flex gap-4 mb-10">
+            <div className="w-[180px] bg-white border shadow-sm rounded-xl px-4 py-3">
+              <p className="text-xs text-gray-500">Жалпы жазбалар</p>
+              <p className="text-lg font-semibold">{total}</p>
+            </div>
 
-        {/* META */}
-        <div className="text-xs text-gray-400">
-          Created: {new Date(reflection.created_at).toLocaleString()}
-        </div>
+            <div className="w-[180px] bg-blue-50 border rounded-xl px-4 py-3">
+              <p className="text-xs text-blue-600">Сабаққа дейін</p>
+              <p className="text-lg font-semibold text-blue-700">{pre}</p>
+            </div>
 
-        {/* LESSON */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <h2 className="font-semibold text-gray-800 mb-3">
-            📘 Lesson Plan
-          </h2>
-
-          <div className="max-h-60 overflow-y-auto text-sm text-gray-600 whitespace-pre-wrap leading-relaxed border-t pt-3">
-            {reflection.lesson_text}
-          </div>
-        </div>
-
-        {/* QUESTIONS + ANSWERS */}
-        {reflection.questions?.length > 0 && (
-          <div className="bg-white p-6 rounded-2xl border shadow-sm">
-            <h2 className="font-semibold text-gray-800 mb-4">
-              ✍️ Your Reflection
-            </h2>
-
-            <div className="space-y-5">
-              {reflection.questions.map((q, i) => (
-                <div key={i} className="p-4 rounded-xl bg-gray-50 border">
-                  <p className="font-semibold text-blue-700">{q.key}</p>
-                  <p className="text-sm text-gray-700 mb-2">
-                    {q.question}
-                  </p>
-
-                  <div className="bg-white p-3 rounded-lg border text-sm text-gray-600">
-                    <strong>Answer:</strong>{" "}
-                    {reflection.answers?.[`Q${i + 1}`] ||
-                      "No answer provided"}
-                  </div>
-                </div>
-              ))}
+            <div className="w-[180px] bg-green-50 border rounded-xl px-4 py-3">
+              <p className="text-xs text-green-600">Сабақтан кейін</p>
+              <p className="text-lg font-semibold text-green-700">{post}</p>
             </div>
           </div>
-        )}
 
-        {/* AI FEEDBACK */}
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <h2 className="font-semibold text-gray-800 mb-4">
-            🧠 AI Feedback
-          </h2>
-
+          {/* LIST */}
           <div className="space-y-4">
+            {reflections.map((item) => (
+              <div key={item.id} className="bg-white rounded-2xl border p-5 shadow-sm">
 
-            {/* POST */}
-            {isPost &&
-              (reflection.feedback as PostFeedback).feedback.map(
-                (item, i) => (
-                  <div key={i} className="p-4 bg-green-50 border rounded-xl">
-                    <p className="font-semibold text-green-800">
-                      {item.category}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      {item.comment}
-                    </p>
-                  </div>
-                )
-              )}
+                <div className="flex justify-between text-xs text-gray-400 mb-2">
+                  <span>{new Date(item.created_at).toLocaleDateString()}</span>
 
-            {/* PRE */}
-            {!isPost &&
-              Object.entries(
-                (reflection.feedback as PreFeedback).feedback || {}
-              ).map(([key, value]) => (
-                <div key={key} className="p-4 bg-green-50 border rounded-xl">
-                  <p className="font-semibold text-green-800">{key}</p>
-                  <p className="text-sm text-gray-700">{value}</p>
+                  <span
+                    className={`px-3 py-1 rounded-full font-medium ${
+                      item.type === "pre"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {item.type === "pre" ? "Сабаққа дейін" : "Сабақтан кейін"}
+                  </span>
                 </div>
-              ))}
+
+                <p className="text-sm text-gray-700 line-clamp-2">
+                  {item.lesson_text}
+                </p>
+
+                <div className="mt-4 flex justify-end">
+                  <Link
+                    href={`/dashboard/${item.id}`}
+                    className="text-sm font-medium hover:text-blue-600"
+                  >
+                    Толығырақ көру →
+                  </Link>
+                </div>
+
+              </div>
+            ))}
           </div>
+
         </div>
-
-        {/* FINAL */}
-        <div className="bg-blue-50 p-6 rounded-2xl border shadow-sm">
-          <h2 className="font-semibold text-blue-800 mb-2">
-            📌 Suggestions
-          </h2>
-
-          <p className="text-sm text-gray-700">
-            {isPost
-              ? (reflection.feedback as PostFeedback).finalSuggestion
-              : (reflection.feedback as PreFeedback).generalSuggestions}
-          </p>
-        </div>
-
-      </div>
+      </main>
     </div>
   );
 }

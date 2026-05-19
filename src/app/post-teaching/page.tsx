@@ -48,10 +48,11 @@ export default function PostTeaching() {
 
     const selectedFiles = Array.from(e.target.files);
 
-    // ✅ FIX: validate BEFORE setting state / sending
+    // ✅ файл өлшемін тексеру
     const tooLarge = selectedFiles.some((f) => f.size > 4_000_000);
+
     if (tooLarge) {
-      alert("One or more files exceed 4MB limit.");
+      alert("Бір немесе бірнеше файл 4MB шегінен асып кетті.");
       return;
     }
 
@@ -62,7 +63,9 @@ export default function PostTeaching() {
     setError("");
 
     const formData = new FormData();
+
     selectedFiles.forEach((f) => formData.append("files", f));
+
     formData.append("mode", "generate");
     formData.append("type", "post");
 
@@ -80,21 +83,32 @@ export default function PostTeaching() {
         data = await res.json();
       } catch {
         const text = await res.text();
-        throw new Error(text || "Upload failed (non-JSON response)");
+
+        throw new Error(
+          text || "Файл жүктеу кезінде қате пайда болды"
+        );
       }
 
       if (!res.ok) {
         const errMsg =
-          typeof data === "object" && data !== null && "error" in data
+          typeof data === "object" &&
+          data !== null &&
+          "error" in data
             ? (data as { error?: string }).error
-            : "Upload failed";
+            : "Файл жүктеу сәтсіз аяқталды";
+
         throw new Error(errMsg);
       }
 
       const parsed = data as { questions?: Question[] };
+
       setQuestions(parsed.questions || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Файл жүктеу сәтсіз аяқталды"
+      );
     } finally {
       setUploading(false);
     }
@@ -102,8 +116,14 @@ export default function PostTeaching() {
 
   /* ================= ANSWERS ================= */
 
-  const handleAnswerChange = (category: string, value: string) => {
-    setAnswers((prev) => ({ ...prev, [category]: value }));
+  const handleAnswerChange = (
+    category: string,
+    value: string
+  ) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [category]: value,
+    }));
   };
 
   /* ================= SUBMIT ================= */
@@ -116,14 +136,16 @@ export default function PostTeaching() {
     );
 
     if (invalid.length > 0) {
-      alert("Each answer must be at least 15 characters.");
+      alert("Әр жауап кемінде 15 таңбадан тұруы керек.");
       return;
     }
 
     setLoadingFeedback(true);
 
     const formData = new FormData();
+
     files.forEach((f) => formData.append("files", f));
+
     formData.append("mode", "feedback");
     formData.append("answers", JSON.stringify(answers));
     formData.append("type", "post");
@@ -140,16 +162,23 @@ export default function PostTeaching() {
         data = await res.json();
       } catch {
         const text = await res.text();
-        throw new Error(text || "Feedback failed (non-JSON response)");
+
+        throw new Error(
+          text || "Кері байланыс жасау кезінде қате пайда болды"
+        );
       }
 
       if (!res.ok) {
-        throw new Error("Failed to generate feedback");
+        throw new Error("AI кері байланысын жасау сәтсіз аяқталды");
       }
 
       setFeedback(data as FeedbackResponse);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to generate feedback");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "AI кері байланысын жасау сәтсіз аяқталды"
+      );
     } finally {
       setLoadingFeedback(false);
     }
@@ -161,13 +190,22 @@ export default function PostTeaching() {
     return (
       <div className="relative min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center px-6 text-center">
         <div className="absolute top-6 left-6">
-          <Image src="/nis.jpg" alt="Logo" width={80} height={80} className="rounded-lg shadow-md" />
+          <Image
+            src="/nis.jpg"
+            alt="Logo"
+            width={80}
+            height={80}
+            className="rounded-lg shadow-md"
+          />
         </div>
+
         <h1 className="text-4xl font-bold text-gray-800 mb-4">
-          Post-Teaching Reflection
+          Сабақтан кейінгі рефлексия
         </h1>
+
         <p className="max-w-xl text-gray-600">
-          Upload your lesson resources and receive AI feedback.
+          Сабақ материалдарын жүктеп,
+          AI арқылы кәсіби кері байланыс алыңыз.
         </p>
       </div>
     );
@@ -180,19 +218,34 @@ export default function PostTeaching() {
       {/* NAVBAR */}
       <div className="flex justify-between items-center px-6 py-4 bg-white shadow-sm">
         <div className="flex items-center gap-3">
-          <Image src="/nis.jpg" alt="Logo" width={40} height={40} className="rounded-md" />
+          <Image
+            src="/nis.jpg"
+            alt="Logo"
+            width={40}
+            height={40}
+            className="rounded-md"
+          />
+
           <h1 className="font-semibold text-lg text-gray-700">
-            Lesson AI Assistant
+            Lesson AI Көмекшісі
           </h1>
         </div>
 
         <div className="flex gap-6">
-          <Link href="/">Pre-Teaching</Link>
-          <Link href="/post-teaching" className="text-blue-600 font-medium">
-            Post-Teaching
+          <Link href="/">Сабаққа дейін</Link>
+
+          <Link
+            href="/post-teaching"
+            className="text-blue-600 font-medium"
+          >
+            Сабақтан кейін
           </Link>
-          <Link href="/dashboard" className="text-gray-600 hover:text-blue-600">
-            Dashboard
+
+          <Link
+            href="/dashboard"
+            className="text-gray-600 hover:text-blue-600"
+          >
+            Басқару панелі
           </Link>
         </div>
 
@@ -203,16 +256,22 @@ export default function PostTeaching() {
       <div className="p-6 max-w-5xl mx-auto">
         {/* UPLOAD */}
         <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-          <h1 className="text-2xl font-bold mb-3">Reflect on Your Teaching</h1>
+          <h1 className="text-2xl font-bold mb-3">
+            Сабағыңызға рефлексия жасаңыз
+          </h1>
 
           <button
             onClick={openFileDialog}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl"
           >
-            {uploading ? "Uploading..." : "Upload Resources"}
+            {uploading
+              ? "Жүктелуде..."
+              : "Материалдарды жүктеу"}
           </button>
-          
-       <h6 className="mt-4 text-sm text-gray-600">File size cannot exceed 4MB </h6>
+
+          <h6 className="mt-4 text-sm text-gray-600">
+            Файл өлшемі 4MB-тан аспауы керек
+          </h6>
 
           <input
             ref={fileInputRef}
@@ -231,7 +290,7 @@ export default function PostTeaching() {
           {files.length > 0 && (
             <ul className="mt-4 text-sm text-gray-600">
               {files.map((f, i) => (
-                <li key={i}>{f.name}</li>
+                <li key={i}>📄 {f.name}</li>
               ))}
             </ul>
           )}
@@ -241,16 +300,26 @@ export default function PostTeaching() {
         {questions.length > 0 && (
           <div className="bg-blue-50 rounded-2xl p-6 mb-6">
             {questions.map((q, i) => (
-              <div key={i} className="mb-4 bg-white p-4 rounded-xl border">
-                <p className="text-blue-600 font-semibold">{q.category}</p>
+              <div
+                key={i}
+                className="mb-4 bg-white p-4 rounded-xl border"
+              >
+                <p className="text-blue-600 font-semibold">
+                  {q.category}
+                </p>
+
                 <p>{q.question}</p>
 
                 <textarea
                   className="mt-3 w-full p-3 border rounded-lg"
                   rows={4}
+                  placeholder="Жауабыңызды жазыңыз..."
                   value={answers[q.category] || ""}
                   onChange={(e) =>
-                    handleAnswerChange(q.category, e.target.value)
+                    handleAnswerChange(
+                      q.category,
+                      e.target.value
+                    )
                   }
                 />
               </div>
@@ -260,25 +329,33 @@ export default function PostTeaching() {
               onClick={handleSubmit}
               className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl"
             >
-              Submit Reflections
+              Рефлексияны жіберу
             </button>
           </div>
         )}
 
         {/* FEEDBACK */}
-        {loadingFeedback && <p>Generating feedback...</p>}
+        {loadingFeedback && (
+          <p>AI кері байланысы жасалуда...</p>
+        )}
 
         {feedback && (
           <div className="bg-white rounded-2xl p-6">
             {feedback.feedback.map((f, i) => (
               <div key={i} className="mb-3">
-                <p className="font-semibold text-blue-600">{f.category}</p>
+                <p className="font-semibold text-blue-600">
+                  {f.category}
+                </p>
+
                 <p>{f.comment}</p>
               </div>
             ))}
 
             <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-              <p className="font-semibold">Final Suggestion</p>
+              <p className="font-semibold">
+                Қорытынды ұсыныс
+              </p>
+
               <p>{feedback.finalSuggestion}</p>
             </div>
           </div>
